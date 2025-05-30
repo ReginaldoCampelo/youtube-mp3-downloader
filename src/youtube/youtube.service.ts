@@ -10,7 +10,7 @@ export class YoutubeService {
   private ytDlpPath = '"D:\\Program Files\\yt-dlp\\yt-dlp.exe"';
 
   /**
-   * Obtém o título do vídeo
+   * Obtém o título do vídeo.
    */
   async getTitle(url: string): Promise<string> {
     return new Promise((resolve, reject) => {
