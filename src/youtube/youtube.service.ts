@@ -23,9 +23,6 @@ export class YoutubeService {
     console.log('[YT-DLP PATH]', this.ytDlpPath);
   }
 
-  /**
-   * Obtém o título do vídeo.
-   */
   async getTitle(url: string): Promise<string> {
     console.log('[getTitle] URL recebida:', url);
 
@@ -60,9 +57,6 @@ export class YoutubeService {
     });
   }
 
-  /**
-   * Baixa um único vídeo como MP3 e envia via stream.
-   */
   downloadSingleAudio(url: string, res: Response): void {
     const args = ['-f', 'bestaudio', '-o', '-', url.split('&')[0]];
 
@@ -80,31 +74,6 @@ export class YoutubeService {
     ytDlp.stdout.pipe(ffmpeg.stdin);
 
     res.setHeader('Content-Disposition', 'attachment; filename=audio.mp3');
-    res.setHeader('Content-Type', 'audio/mpeg');
-
-    ffmpeg.stdout.pipe(res);
-  }
-
-  /**
-   * Envia uma playlist como MP3 via stream (sem salvar).
-   */
-  downloadPlaylistStream(url: string, res: Response): void {
-    const args = ['--yes-playlist', '-f', 'bestaudio', '-o', '-', url];
-
-    const ytDlp = spawn(
-      this.ytDlpPath,
-      args,
-      this.isWindows ? { shell: true } : undefined,
-    );
-    const ffmpeg = spawn(
-      'ffmpeg',
-      ['-i', 'pipe:0', '-f', 'mp3', '-b:a', '128k', '-vn', 'pipe:1'],
-      this.isWindows ? { shell: true } : undefined,
-    );
-
-    ytDlp.stdout.pipe(ffmpeg.stdin);
-
-    res.setHeader('Content-Disposition', 'attachment; filename=playlist.mp3');
     res.setHeader('Content-Type', 'audio/mpeg');
 
     ffmpeg.stdout.pipe(res);
@@ -187,12 +156,16 @@ export class YoutubeService {
         console.error('[yt-dlp stderr]', data.toString());
       });
 
-      command.on('error', reject);
+      command.on('error', (err) => {
+        reject(new Error(`Erro ao executar yt-dlp: ${err.message}`));
+      });
 
       command.on('close', (code) => {
         console.log('[yt-dlp zip mode closed with code]', code);
 
-        if (code !== 0) return reject(new Error('yt-dlp falhou'));
+        if (code !== 0) {
+          return reject(new Error('yt-dlp falhou com código diferente de 0'));
+        }
 
         const files = fs.readdirSync(tmpPath);
         console.log('[Arquivos encontrados para ZIP]', files);
@@ -210,13 +183,27 @@ export class YoutubeService {
         const archive = archiver('zip', { zlib: { level: 9 } });
         archive.pipe(res);
 
+        archive.on('error', (err) => {
+          console.error('[zip error]', err);
+          reject(new Error(`Erro ao gerar ZIP: ${err.message}`));
+        });
+
+        archive.on('end', () => {
+          console.log('[zip stream finalizado]');
+          resolve();
+        });
+
+        res.on('close', () => {
+          console.warn('[res] Conexão encerrada pelo cliente');
+          archive.abort();
+        });
+
         files.forEach((file) => {
           const filePath = path.join(tmpPath, file);
           archive.file(filePath, { name: file });
         });
 
         archive.finalize();
-        resolve();
       });
     });
   }
