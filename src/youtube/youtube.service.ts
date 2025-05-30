@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import * as archiver from 'archiver';
 import { spawn } from 'child_process';
 import { Response } from 'express';
 import * as fs from 'fs';
@@ -109,9 +110,6 @@ export class YoutubeService {
     ffmpeg.stdout.pipe(res);
   }
 
-  /**
-   * Apenas em modo local: baixa playlist como arquivos na pasta Downloads.
-   */
   async downloadPlaylistToFolder(
     url: string,
     folderName: string = 'playlist',
@@ -153,6 +151,72 @@ export class YoutubeService {
         console.log('[yt-dlp playlist closed with code]', code);
         if (code === 0) resolve(targetFolder);
         else reject(new Error('Erro ao baixar playlist'));
+      });
+    });
+  }
+
+  async downloadPlaylistAsZipStream(
+    url: string,
+    folderName: string = 'playlist',
+    res: Response,
+  ): Promise<void> {
+    const safeFolderName = folderName
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-zA-Z0-9-_]/g, '');
+
+    const tmpPath = path.join('/tmp', safeFolderName);
+    fs.mkdirSync(tmpPath, { recursive: true });
+
+    const args = [
+      '--yes-playlist',
+      '-f',
+      'bestaudio',
+      '-x',
+      '--audio-format',
+      'mp3',
+      '-o',
+      `${tmpPath}/%(title)s.%(ext)s`,
+      url,
+    ];
+
+    const command = spawn(this.ytDlpPath, args, { shell: true });
+
+    return new Promise((resolve, reject) => {
+      command.stderr.on('data', (data) => {
+        console.error('[yt-dlp stderr]', data.toString());
+      });
+
+      command.on('error', reject);
+
+      command.on('close', (code) => {
+        console.log('[yt-dlp zip mode closed with code]', code);
+
+        if (code !== 0) return reject(new Error('yt-dlp falhou'));
+
+        const files = fs.readdirSync(tmpPath);
+        console.log('[Arquivos encontrados para ZIP]', files);
+
+        if (!files.length) {
+          return reject(new Error('Nenhum arquivo MP3 encontrado'));
+        }
+
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename=${safeFolderName}.zip`,
+        );
+        res.setHeader('Content-Type', 'application/zip');
+
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        archive.pipe(res);
+
+        files.forEach((file) => {
+          const filePath = path.join(tmpPath, file);
+          archive.file(filePath, { name: file });
+        });
+
+        archive.finalize();
+        resolve();
       });
     });
   }
