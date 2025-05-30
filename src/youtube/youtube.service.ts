@@ -6,11 +6,18 @@ import * as path from 'path';
 
 @Injectable()
 export class YoutubeService {
-  // Caminho completo para o yt-dlp
-  private ytDlpPath = '"D:\\Program Files\\yt-dlp\\yt-dlp.exe"';
+  private readonly ytDlpPath: string;
+
+  constructor() {
+    const isDev = process.env.NODE_ENV !== 'production';
+
+    this.ytDlpPath = isDev
+      ? '"D:\\Program Files\\yt-dlp\\yt-dlp.exe"' // Windows path
+      : '/usr/local/bin/yt-dlp'; // Linux path usado no Dockerfile
+  }
 
   /**
-   * Obtém o título do vídeo
+   * Obtém o título do vídeo.
    */
   async getTitle(url: string): Promise<string> {
     return new Promise((resolve, reject) => {
