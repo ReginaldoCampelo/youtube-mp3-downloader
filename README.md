@@ -105,7 +105,7 @@ npm run test:e2e
 
 Feito com ❤️ por **Reginaldo Campelo**  
 - [GitHub](https://github.com/reginaldocampelo)  
-- [LinkedIn](https://linkedin.com/in/reginaldocampelo)
+- [LinkedIn](https://www.linkedin.com/in/reginaldo-campelo-b66555163/)
 
 ---
 
