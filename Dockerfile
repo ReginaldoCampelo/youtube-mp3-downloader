@@ -11,18 +11,16 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Etapa 2 - Runtime com yt-dlp e ffmpeg
-FROM node:18-alpine
+# Etapa 2 - Runtime com yt-dlp e ffmpeg via APK (sem pip)
+FROM node:20-alpine
 
 # Instala dependências essenciais e yt-dlp + ffmpeg
-RUN apk add --no-cache ffmpeg python3 py3-pip && \
-    pip install yt-dlp
+RUN apk add --no-cache ffmpeg python3 yt-dlp
 
 WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
-COPY package.json .
 
 ENV NODE_ENV=production
 
