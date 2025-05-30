@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { spawn } from 'child_process';
+import { Response } from 'express';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -29,7 +30,6 @@ export class YoutubeService {
 
     return new Promise((resolve, reject) => {
       const args = ['--print', '%(title)s', '--no-playlist', url.split('&')[0]];
-
       const command = spawn(
         this.ytDlpPath,
         args,
@@ -60,9 +60,9 @@ export class YoutubeService {
   }
 
   /**
-   * Baixa um único vídeo como MP3 e envia via stream para o frontend
+   * Baixa um único vídeo como MP3 e envia via stream.
    */
-  downloadSingleAudio(url: string, res): void {
+  downloadSingleAudio(url: string, res: Response): void {
     const args = ['-f', 'bestaudio', '-o', '-', url.split('&')[0]];
 
     const ytDlp = spawn(
@@ -85,7 +85,32 @@ export class YoutubeService {
   }
 
   /**
-   * Baixa uma playlist completa em uma pasta local no diretório de Downloads
+   * Envia uma playlist como MP3 via stream (sem salvar).
+   */
+  downloadPlaylistStream(url: string, res: Response): void {
+    const args = ['--yes-playlist', '-f', 'bestaudio', '-o', '-', url];
+
+    const ytDlp = spawn(
+      this.ytDlpPath,
+      args,
+      this.isWindows ? { shell: true } : undefined,
+    );
+    const ffmpeg = spawn(
+      'ffmpeg',
+      ['-i', 'pipe:0', '-f', 'mp3', '-b:a', '128k', '-vn', 'pipe:1'],
+      this.isWindows ? { shell: true } : undefined,
+    );
+
+    ytDlp.stdout.pipe(ffmpeg.stdin);
+
+    res.setHeader('Content-Disposition', 'attachment; filename=playlist.mp3');
+    res.setHeader('Content-Type', 'audio/mpeg');
+
+    ffmpeg.stdout.pipe(res);
+  }
+
+  /**
+   * Apenas em modo local: baixa playlist como arquivos na pasta Downloads.
    */
   async downloadPlaylistToFolder(
     url: string,

@@ -25,6 +25,7 @@ export class YoutubeController {
     @Res() res: Response,
   ) {
     const { url, type, folderName } = body;
+    const isProd = process.env.NODE_ENV === 'production';
 
     if (!url || !url.startsWith('http')) {
       return res.status(HttpStatus.BAD_REQUEST).send('URL inválida');
@@ -32,14 +33,20 @@ export class YoutubeController {
 
     try {
       if (type === 'playlist') {
-        await this.youtubeService.downloadPlaylistToFolder(
-          url,
-          folderName ?? 'playlist',
-        );
-        res.json({
-          message: 'Download finalizado',
-          path: `~/Downloads/${folderName ?? 'playlist'}`,
-        });
+        if (isProd) {
+          // Em produção: stream como único arquivo MP3
+          this.youtubeService.downloadPlaylistStream(url, res);
+        } else {
+          // Em dev: salvar como múltiplos arquivos locais
+          const path = await this.youtubeService.downloadPlaylistToFolder(
+            url,
+            folderName ?? 'playlist',
+          );
+          res.json({
+            message: 'Download finalizado localmente',
+            path,
+          });
+        }
       } else {
         this.youtubeService.downloadSingleAudio(url, res);
       }
