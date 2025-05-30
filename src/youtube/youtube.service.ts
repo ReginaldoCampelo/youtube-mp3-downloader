@@ -12,8 +12,8 @@ export class YoutubeService {
     const isDev = process.env.NODE_ENV !== 'production';
 
     this.ytDlpPath = isDev
-      ? '"D:\\Program Files\\yt-dlp\\yt-dlp.exe"' // Windows path
-      : '/usr/local/bin/yt-dlp'; // Linux path usado no Dockerfile
+      ? '"D:\\Program Files\\yt-dlp\\yt-dlp.exe"'
+      : 'yt-dlp';
   }
 
   /**
