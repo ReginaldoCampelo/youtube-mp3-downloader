@@ -149,7 +149,11 @@ export class YoutubeService {
       url,
     ];
 
-    const command = spawn(this.ytDlpPath, args, { shell: true });
+    const command = spawn(
+      this.ytDlpPath,
+      args,
+      this.isWindows ? { shell: true } : undefined,
+    );
 
     return new Promise((resolve, reject) => {
       command.stderr.on('data', (data) => {
