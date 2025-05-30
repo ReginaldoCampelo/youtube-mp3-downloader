@@ -7,13 +7,16 @@ import * as path from 'path';
 @Injectable()
 export class YoutubeService {
   private readonly ytDlpPath: string;
+  private readonly isWindows: boolean;
 
   constructor() {
     const isDev = process.env.NODE_ENV !== 'production';
+    this.isWindows = process.platform === 'win32';
 
-    this.ytDlpPath = isDev
-      ? 'D:\\Program Files\\yt-dlp\\yt-dlp.exe' // sem aspas!
-      : 'yt-dlp';
+    this.ytDlpPath =
+      isDev && this.isWindows
+        ? `"D:\\Program Files\\yt-dlp\\yt-dlp.exe"`
+        : 'yt-dlp';
 
     console.log('[YT-DLP PATH]', this.ytDlpPath);
   }
@@ -25,10 +28,12 @@ export class YoutubeService {
     console.log('[getTitle] URL recebida:', url);
 
     return new Promise((resolve, reject) => {
+      const args = ['--print', '%(title)s', '--no-playlist', url.split('&')[0]];
+
       const command = spawn(
         this.ytDlpPath,
-        ['--print', '%(title)s', '--no-playlist', url.split('&')[0]],
-        { shell: true },
+        args,
+        this.isWindows ? { shell: true } : undefined,
       );
 
       let output = '';
@@ -58,16 +63,17 @@ export class YoutubeService {
    * Baixa um único vídeo como MP3 e envia via stream para o frontend
    */
   downloadSingleAudio(url: string, res): void {
+    const args = ['-f', 'bestaudio', '-o', '-', url.split('&')[0]];
+
     const ytDlp = spawn(
       this.ytDlpPath,
-      ['-f', 'bestaudio', '-o', '-', url.split('&')[0]],
-      { shell: true },
+      args,
+      this.isWindows ? { shell: true } : undefined,
     );
-
     const ffmpeg = spawn(
       'ffmpeg',
       ['-i', 'pipe:0', '-f', 'mp3', '-b:a', '128k', '-vn', 'pipe:1'],
-      { shell: true },
+      this.isWindows ? { shell: true } : undefined,
     );
 
     ytDlp.stdout.pipe(ffmpeg.stdin);
@@ -93,30 +99,33 @@ export class YoutubeService {
     const targetFolder = path.join(os.homedir(), 'Downloads', safeFolderName);
     fs.mkdirSync(targetFolder, { recursive: true });
 
+    const args = [
+      '--yes-playlist',
+      '-f',
+      'bestaudio',
+      '-x',
+      '--audio-format',
+      'mp3',
+      '-o',
+      `${targetFolder}/%(title)s.%(ext)s`,
+      url,
+    ];
+
     const command = spawn(
       this.ytDlpPath,
-      [
-        '--yes-playlist',
-        '-f',
-        'bestaudio',
-        '-x',
-        '--audio-format',
-        'mp3',
-        '-o',
-        `${targetFolder}/%(title)s.%(ext)s`,
-        url,
-      ],
-      { shell: true },
+      args,
+      this.isWindows ? { shell: true } : undefined,
     );
 
     return new Promise((resolve, reject) => {
       command.stderr.on('data', (data) => {
-        console.error('[yt-dlp]', data.toString());
+        console.error('[yt-dlp stderr]', data.toString());
       });
 
       command.on('error', reject);
 
       command.on('close', (code) => {
+        console.log('[yt-dlp playlist closed with code]', code);
         if (code === 0) resolve(targetFolder);
         else reject(new Error('Erro ao baixar playlist'));
       });
