@@ -34,10 +34,12 @@ export class YoutubeController {
     try {
       if (type === 'playlist') {
         if (isProd) {
-          // Em produção: stream como único arquivo MP3
-          this.youtubeService.downloadPlaylistStream(url, res);
+          await this.youtubeService.downloadPlaylistAsZipStream(
+            url,
+            folderName ?? 'playlist',
+            res,
+          );
         } else {
-          // Em dev: salvar como múltiplos arquivos locais
           const path = await this.youtubeService.downloadPlaylistToFolder(
             url,
             folderName ?? 'playlist',
@@ -52,7 +54,9 @@ export class YoutubeController {
       }
     } catch (err) {
       console.error('Erro no download:', err);
-      res.status(500).send('Erro ao processar download');
+      if (!res.headersSent) {
+        res.status(500).send('Erro ao processar download');
+      }
     }
   }
 }
