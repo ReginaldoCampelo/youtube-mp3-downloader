@@ -6,7 +6,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:3001',
-      'https://banana-music.up.railway.app',
+      'https://naty.up.railway.app',
       'http://localhost:4173/',
     ],
   });
