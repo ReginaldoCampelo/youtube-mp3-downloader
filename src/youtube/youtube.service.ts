@@ -171,8 +171,13 @@ export class YoutubeService {
           return reject(new Error('yt-dlp falhou com código diferente de 0'));
         }
 
-        const files = fs.readdirSync(tmpPath);
-        console.log('[Arquivos encontrados para ZIP]', files);
+        let files: string[];
+        try {
+          files = fs.readdirSync(tmpPath);
+        } catch (err) {
+          console.error('[zip error] Falha ao ler arquivos temporários', err);
+          return reject(new Error('Erro ao ler arquivos temporários'));
+        }
 
         if (!files.length) {
           return reject(new Error('Nenhum arquivo MP3 encontrado'));
@@ -187,19 +192,32 @@ export class YoutubeService {
         const archive = archiver('zip', { zlib: { level: 9 } });
         archive.pipe(res);
 
+        const cleanup = () => {
+          fs.rm(tmpPath, { recursive: true, force: true }, (err) => {
+            if (err) {
+              console.error(`[cleanup error] Falha ao remover ${tmpPath}`, err);
+            } else {
+              console.log(`[cleanup] Pasta ${tmpPath} removida com sucesso`);
+            }
+          });
+        };
+
         archive.on('error', (err) => {
           console.error('[zip error]', err);
+          cleanup();
           reject(new Error(`Erro ao gerar ZIP: ${err.message}`));
         });
 
         archive.on('end', () => {
           console.log('[zip stream finalizado]');
+          cleanup();
           resolve();
         });
 
         res.on('close', () => {
           console.warn('[res] Conexão encerrada pelo cliente');
           archive.abort();
+          cleanup();
         });
 
         files.forEach((file) => {
